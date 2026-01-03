@@ -170,5 +170,87 @@ function createResultCard(label, value, isHighlight = false, isText = false, ext
       <div class="result-label">${label}</div>
       <div class="result-value">${formattedValue}</div>
     </div>
+    </div>
   `;
+}
+
+/* Chatbot Logic */
+/* Note: Variables are re-declared here for clarity in this block, 
+   but in strict mode inside a module or global, we should be careful. 
+   Since this is a simple script, it's fine. */
+
+// Wait for DOM or just run if deferred.
+// We are at end of body so elements exist.
+
+const chatWidget = document.getElementById('chat-widget');
+const chatWindow = document.getElementById('chat-window');
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const chatSend = document.getElementById('chat-send');
+const chatToggle = document.getElementById('chat-toggle');
+
+// Toggle Chat
+if (chatToggle) {
+    chatToggle.addEventListener('click', () => {
+    const isHidden = chatWindow.style.display === 'none' || chatWindow.style.display === '';
+    if (isHidden) {
+        chatWindow.style.display = 'flex';
+        gsap.fromTo(chatWindow, { opacity: 0, y: 20, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: 'back.out(1.2)' });
+        setTimeout(() => chatInput.focus(), 300);
+    } else {
+        gsap.to(chatWindow, { opacity: 0, y: 20, scale: 0.9, duration: 0.2, onComplete: () => chatWindow.style.display = 'none' });
+    }
+    });
+}
+
+// Send Message
+async function sendMessage() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  // Append user message
+  appendMessage(text, 'user');
+  chatInput.value = '';
+
+  // Loading indicator
+  const loadingId = appendMessage('Thinking...', 'bot', true);
+
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+
+    const data = await response.json();
+    
+    // Remove loading and show response
+    const loader = document.getElementById(loadingId);
+    if(loader) loader.remove();
+    appendMessage(data.reply || "Sorry, I couldn't connect to the AI.", 'bot');
+  } catch (error) {
+    const loader = document.getElementById(loadingId);
+    if(loader) loader.remove();
+    appendMessage("Error: Is the backend server running?", 'bot');
+  }
+}
+
+if (chatSend) {
+    chatSend.addEventListener('click', sendMessage);
+}
+if (chatInput) {
+    chatInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+    });
+}
+
+function appendMessage(text, sender, isLoading = false) {
+  const id = 'msg-' + Date.now();
+  const div = document.createElement('div');
+  div.id = id;
+  div.className = `chat-message ${sender} ${isLoading ? 'loading' : ''}`;
+  div.textContent = text;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return id;
 }
