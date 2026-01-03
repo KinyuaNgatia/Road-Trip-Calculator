@@ -68,20 +68,17 @@ function calculate() {
   const profit = revenue - totalCost;
   const profitMargin = revenue > 0 ? profit / revenue : 0;
 
-  let suggestion = `<div class="suggestion-box success">Pricing is healthy.</div>`;
-  if (profitMargin < minMargin) {
-    suggestion = `
-      <div class="suggestion-box warning">
-        <strong>Warning: Profit margin below 10%</strong>
-        <ul>
-          <li>Increase price per person</li>
-          <li>Add 1–2 more clients</li>
-          <li>Reduce lunch or activity cost</li>
-        </ul>
-      </div>`;
-  }
-
-  // Render logic optimized for structure
+  // Smart Suggestions
+  const suggestions = generateSmartSuggestions(
+    profitMargin, 
+    minMargin, 
+    clients, 
+    transportCost,
+    variableCostPerPerson,
+    recommendedPrice,
+    profit
+  );
+  
   const resultsContainer = document.getElementById("results");
   resultsContainer.style.opacity = 1;
   resultsContainer.innerHTML = `
@@ -93,18 +90,75 @@ function calculate() {
     ${createResultCard('Total Trip Cost', totalCost)}
     ${createResultCard('Fuel Cost', fuelCost)}
     ${createResultCard('Total Transport', transportCost)}
-    ${suggestion}
+    ${suggestions}
   `;
 
   // Animate results in
-  gsap.from(".result-card, .suggestion-box", {
+  gsap.from(".result-card, .suggestion-box, .opportunity-card", {
     duration: 0.6,
     y: 20,
     opacity: 0,
     stagger: 0.05,
-    ease: "power2.out",
+    ease: "power2.out"
   });
 }
+
+function generateSmartSuggestions(margin, minMargin, clients, fixedCost, variableCost, price, currentProfit) {
+  let html = '';
+  
+  // 1. Health Check
+  if (margin < minMargin) {
+    html += `
+      <div class="suggestion-box warning">
+        <strong>⚠️ Low Profit Margin (${(margin * 100).toFixed(1)}%)</strong>
+        <p>Goal: 10%+. Suggestion: Increase price to <strong>KES ${Math.ceil((fixedCost + (variableCost * clients)) / clients * 1.15).toLocaleString()}</strong>.</p>
+      </div>`;
+  } else {
+     html += `<div class="suggestion-box success">✅ Pricing is healthy.</div>`;
+  }
+
+  // 2. Opportunities
+  html += '<h3 style="grid-column: 1/-1; margin-top: 20px; margin-bottom: 10px; font-size: 1.1rem; color: #4b5563;">💡 Smart Opportunities</h3>';
+
+  // Op 1: Add 1 Client
+  if (clients < 50) { // arbitrary max
+    const newClients = clients + 1;
+    const newTotalCost = fixedCost + (variableCost * newClients);
+    const newRevenue = price * newClients;
+    const newProfit = newRevenue - newTotalCost;
+    const profitDiff = newProfit - currentProfit;
+    
+    html += createOpportunityCard(
+      `Add 1 Client`, 
+      `Total Profit increases by <strong style="color:var(--success-color)">KES ${Math.round(profitDiff).toLocaleString()}</strong> to <strong>KES ${Math.round(newProfit).toLocaleString()}</strong> (keeping price constant).`,
+      `border-left: 4px solid var(--primary-color);`
+    );
+  }
+
+  // Op 2: Reduce Variable Costs by 10%
+  const leanVariable = variableCost * 0.9;
+  const leanTotalCost = fixedCost + (leanVariable * clients);
+  const leanProfit = (price * clients) - leanTotalCost;
+  const leanProfitDiff = leanProfit - currentProfit;
+  
+  html += createOpportunityCard(
+    `Reduce Food/Activity Costs by 10%`, 
+    `Profit boosts by <strong style="color:var(--success-color)">KES ${Math.round(leanProfitDiff).toLocaleString()}</strong> to <strong>KES ${Math.round(leanProfit).toLocaleString()}</strong>.`,
+    `border-left: 4px solid var(--success-color);`
+  );
+
+  return html;
+}
+
+function createOpportunityCard(title, desc, style) {
+  return `
+    <div class="opportunity-card" style="grid-column: 1/-1; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); ${style}">
+      <div style="font-weight: 700; color: var(--text-dark); margin-bottom: 4px;">${title}</div>
+      <div style="font-size: 0.9rem; color: #4b5563;">${desc}</div>
+    </div>
+  `;
+}
+
 
 function createResultCard(label, value, isHighlight = false, isText = false, extraClass = '') {
   const formattedValue = isText
